@@ -108,7 +108,6 @@ inline void migrateNimBLEBondsOnce(const char *logTag) {
     }
     if (layout == NimBLEBondStoreLayout::Unknown) {
         ESP_LOGW(logTag, "NimBLE bond store has unexpected record size; existing pairing may need re-pair");
-        prefs.putBool(GM_BLE_NVS_BOND2X_KEY, true);
         prefs.end();
         return;
     }
