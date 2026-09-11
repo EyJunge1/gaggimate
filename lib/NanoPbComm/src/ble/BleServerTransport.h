@@ -52,12 +52,11 @@ class BleServerTransport : public Transport, public NimBLEServerCallbacks, publi
     void loadPairedPeer();
     void savePairedPeer(const NimBLEAddress &address);
 
-    void onConnect(NimBLEServer *server) override;
-    void onConnect(NimBLEServer *server, ble_gap_conn_desc *desc) override;
-    void onAuthenticationComplete(ble_gap_conn_desc *desc) override;
-    void onDisconnect(NimBLEServer *server) override;
-    void onWrite(NimBLECharacteristic *characteristic) override;
-    void onSubscribe(NimBLECharacteristic *pCharacteristic, ble_gap_conn_desc *desc, uint16_t subValue) override;
+    void onConnect(NimBLEServer *server, NimBLEConnInfo &connInfo) override;
+    void onAuthenticationComplete(NimBLEConnInfo &connInfo) override;
+    void onDisconnect(NimBLEServer *server, NimBLEConnInfo &connInfo, int reason) override;
+    void onWrite(NimBLECharacteristic *characteristic, NimBLEConnInfo &connInfo) override;
+    void onSubscribe(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo, uint16_t subValue) override;
 
     static constexpr const char *LOG_TAG = "BleServerTransport";
 };

@@ -11,7 +11,7 @@
   "platforms": ["espressif32"],
   "dependencies": {
     "nanopb/Nanopb": "^0.4.9",
-    "h2zero/NimBLE-Arduino": "^1.4.0"
+    "h2zero/NimBLE-Arduino": "2.5.1"
   },
   "build": {
     "flags": ["-I src"]

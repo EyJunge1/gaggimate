@@ -1,13 +1,13 @@
 #include "BleClientTransport.h"
+#include "NimBLEBondStore.h"
 #include <Preferences.h>
 
-// Paired controller address in our own NVS; NimBLE's bond store is shared with scales (3 slots, evicting) and can't gate this.
-static constexpr const char *NVS_NAMESPACE = "gmble";
-static constexpr const char *NVS_PEER_KEY = "peer";
-
 void BleClientTransport::init(const String &deviceName) {
+    migrateNimBLEBondsOnce(LOG_TAG);
+
     NimBLEDevice::init(deviceName.c_str());
-    NimBLEDevice::setPower(ESP_PWR_LVL_P9);
+    ESP_LOGI(LOG_TAG, "%s", NimBLEDevice::getVersion());
+    NimBLEDevice::setPower(9);
     NimBLEDevice::setMTU(256);
     // Just Works bonding with LE Secure Connections, mirroring the controller.
     NimBLEDevice::setSecurityAuth(true, false, true);
@@ -19,20 +19,22 @@ void BleClientTransport::init(const String &deviceName) {
         ESP_LOGE(LOG_TAG, "Failed to create BLE client");
         return;
     }
-    _client->setClientCallbacks(this);
+    _client->setClientCallbacks(this, false);
+    // 2.5.0: retry HCI 0x3e establishment failures (default is already 2; keep it explicit).
+    _client->setConnectRetries(2);
     scan();
 }
 
 void BleClientTransport::scan() {
     _readyForConnection = false;
-    _scanner->clearDuplicateCache();
-    _scanner->setAdvertisedDeviceCallbacks(this, true);
+    _scanner->setScanCallbacks(this, true);
     _scanner->setInterval(1000);
     _scanner->setWindow(50);
     _scanner->setMaxResults(0);
     _scanner->setDuplicateFilter(false);
     _scanner->setActiveScan(false);
-    _scanner->start(0, nullptr, false); // 0 = continuous
+    if (!_scanner->start(0, false, true)) // 0 = continuous; restart clears the duplicate cache
+        ESP_LOGW(LOG_TAG, "Scan start failed");
 }
 
 void BleClientTransport::maintain() {
@@ -131,15 +133,11 @@ bool BleClientTransport::connectToServer() {
 
 void BleClientTransport::loadPairedPeer() {
     Preferences prefs;
-    if (!prefs.begin(NVS_NAMESPACE, true))
+    if (!prefs.begin(GM_BLE_NVS_NAMESPACE, true))
         return;
     uint8_t buf[7];
-    if (prefs.getBytes(NVS_PEER_KEY, buf, sizeof(buf)) == sizeof(buf)) {
-        // Bytes are native order from getNative(); the uint8_t[6] ctor would reverse them, so restore via ble_addr_t.
-        ble_addr_t addr;
-        memcpy(addr.val, buf, 6);
-        addr.type = buf[6];
-        _pairedPeer = NimBLEAddress(addr);
+    if (prefs.getBytes(GM_BLE_NVS_PEER_KEY, buf, sizeof(buf)) == sizeof(buf)) {
+        _pairedPeer = unpackPeerAddress(buf);
         _havePairedPeer = true;
         ESP_LOGI(LOG_TAG, "Paired to controller %s", _pairedPeer.toString().c_str());
     }
@@ -150,12 +148,11 @@ void BleClientTransport::savePairedPeer(const NimBLEAddress &address) {
     if (_havePairedPeer && _pairedPeer == address)
         return;
     Preferences prefs;
-    if (!prefs.begin(NVS_NAMESPACE, false))
+    if (!prefs.begin(GM_BLE_NVS_NAMESPACE, false))
         return;
     uint8_t buf[7];
-    memcpy(buf, address.getNative(), 6);
-    buf[6] = address.getType();
-    prefs.putBytes(NVS_PEER_KEY, buf, sizeof(buf));
+    packPeerAddress(address, buf);
+    prefs.putBytes(GM_BLE_NVS_PEER_KEY, buf, sizeof(buf));
     prefs.end();
     _pairedPeer = address;
     _havePairedPeer = true;
@@ -167,8 +164,8 @@ void BleClientTransport::clearBonds() {
     if (_havePairedPeer)
         NimBLEDevice::deleteBond(_pairedPeer);
     Preferences prefs;
-    if (prefs.begin(NVS_NAMESPACE, false)) {
-        prefs.remove(NVS_PEER_KEY);
+    if (prefs.begin(GM_BLE_NVS_NAMESPACE, false)) {
+        prefs.remove(GM_BLE_NVS_PEER_KEY);
         prefs.end();
     }
     _havePairedPeer = false;
@@ -209,13 +206,12 @@ bool BleClientTransport::isConnected() const { return _client != nullptr && _cli
 bool BleClientTransport::isEncrypted() const {
     if (_client == nullptr || !_client->isConnected())
         return false;
-    ble_gap_conn_desc desc;
-    if (ble_gap_conn_find(_client->getConnId(), &desc) != 0)
-        return false;
-    return desc.sec_state.encrypted;
+    return _client->getConnInfo().isEncrypted();
 }
 
-void BleClientTransport::onResult(NimBLEAdvertisedDevice *advertisedDevice) {
+void BleClientTransport::onResult(const NimBLEAdvertisedDevice *advertisedDevice) {
+    if (advertisedDevice == nullptr)
+        return;
     if (_havePairedPeer) {
         // Our controller advertises directed PDUs, which carry no payload -- match on address alone.
         if (advertisedDevice->getAddress() != _pairedPeer)
@@ -242,7 +238,7 @@ void BleClientTransport::onResult(NimBLEAdvertisedDevice *advertisedDevice) {
     _readyForConnection = true;
 }
 
-bool BleClientTransport::isLockedToOther(NimBLEAdvertisedDevice *advertisedDevice) const {
+bool BleClientTransport::isLockedToOther(const NimBLEAdvertisedDevice *advertisedDevice) const {
     // Lock owner is broadcast as mfg data: 0xFFFF + paired display address in native order, zeros when unpaired.
     if (!advertisedDevice->haveManufacturerData())
         return false;
@@ -254,12 +250,23 @@ bool BleClientTransport::isLockedToOther(NimBLEAdvertisedDevice *advertisedDevic
     if (memcmp(owner, zeros, sizeof(zeros)) == 0)
         return false; // open for pairing
     // Locked to us is fine (we lost NVS, controller kept the pairing); compare raw native bytes -- no NimBLEAddress round-trip.
-    return memcmp(owner, NimBLEDevice::getAddress().getNative(), sizeof(zeros)) != 0;
+    return memcmp(owner, NimBLEDevice::getAddress().getVal(), sizeof(zeros)) != 0;
 }
 
-void BleClientTransport::onDisconnect(NimBLEClient *client) {
+void BleClientTransport::onScanEnd(const NimBLEScanResults &results, int reason) {
+    (void)results;
+    if (_client == nullptr || _scanner == nullptr)
+        return;
+    // stop() from onResult completes asynchronously; _readyForConnection is already set by then.
+    if (_readyForConnection || _client->isConnected())
+        return;
+    ESP_LOGI(LOG_TAG, "Scan ended, reason=%d, restarting", reason);
+    scan();
+}
+
+void BleClientTransport::onDisconnect(NimBLEClient *client, int reason) {
     (void)client;
-    ESP_LOGI(LOG_TAG, "Disconnected, will rescan");
+    ESP_LOGI(LOG_TAG, "Disconnected, reason=%d, will rescan", reason);
     _writeChar = nullptr;
     _notifyChar = nullptr;
     _incompatible = false;

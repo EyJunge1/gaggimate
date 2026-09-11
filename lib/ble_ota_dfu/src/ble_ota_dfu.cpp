@@ -150,29 +150,8 @@ uint16_t BLEOverTheAirDeviceFirmwareUpdate::write_binary(fs::FS *file_system, co
     }
 }
 
-void BLEOverTheAirDeviceFirmwareUpdate::onNotify(BLECharacteristic *pCharacteristic) {
-#ifdef DEBUG_BLE_OTA_DFU_TX
-    // uint8_t *pData;
-    std::string value = pCharacteristic->getValue();
-    uint16_t len = value.length();
-    // pData = pCharacteristic->getData();
-    uint8_t *pData = (uint8_t *)value.data();
-
-    if (pData != NULL) {
-        ESP_LOGD(TAG, "Notify callback for characteristic %s  of data length %d", pCharacteristic->getUUID().toString().c_str(),
-                 len);
-
-        // Print transferred packets
-        Serial.print("TX  ");
-        for (uint16_t i = 0; i < len; i++) {
-            Serial.printf("%02X ", pData[i]);
-        }
-        Serial.println();
-    }
-#endif
-}
-
-void BLEOverTheAirDeviceFirmwareUpdate::onWrite(BLECharacteristic *pCharacteristic) {
+void BLEOverTheAirDeviceFirmwareUpdate::onWrite(NimBLECharacteristic *pCharacteristic, NimBLEConnInfo &connInfo) {
+    (void)connInfo;
     // uint8_t *pData;
     std::string value = pCharacteristic->getValue();
     uint16_t len = value.length();
@@ -206,8 +185,7 @@ void BLEOverTheAirDeviceFirmwareUpdate::onWrite(BLECharacteristic *pCharacterist
                                     static_cast<uint8_t>(used_size >> 16),
                                     static_cast<uint8_t>(used_size >> 8),
                                     static_cast<uint8_t>(used_size)};
-            OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->setValue(flash_size, 7);
-            OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->notify();
+            OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->notify(flash_size, 7);
             delay(10);
         } break;
 
@@ -231,8 +209,7 @@ void BLEOverTheAirDeviceFirmwareUpdate::onWrite(BLECharacteristic *pCharacterist
             if ((current_progression < parts - 1) && !FASTMODE) {
                 uint8_t progression[] = {0xF1, (uint8_t)((current_progression + 1) / 256),
                                          (uint8_t)((current_progression + 1) % 256)};
-                OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->setValue(progression, 3);
-                OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->notify();
+                OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->notify(progression, 3);
                 delay(10);
             }
 
@@ -241,8 +218,7 @@ void BLEOverTheAirDeviceFirmwareUpdate::onWrite(BLECharacteristic *pCharacterist
                 // If all the file has been received, send the progression
                 uint8_t progression[] = {0xF2, (uint8_t)((current_progression + 1) / 256),
                                          (uint8_t)((current_progression + 1) % 256)};
-                OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->setValue(progression, 3);
-                OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->notify();
+                OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->notify(progression, 3);
                 delay(10);
 
                 if (received_file_size != expected_file_size) {
@@ -276,8 +252,7 @@ void BLEOverTheAirDeviceFirmwareUpdate::onWrite(BLECharacteristic *pCharacterist
             OTA_DFU_BLE->setUpdating(true);
             // Send mode ("fast" or "slow")
             uint8_t mode[] = {0xAA, FASTMODE};
-            OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->setValue(mode, 2);
-            OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->notify();
+            OTA_DFU_BLE->pCharacteristic_BLE_OTA_DFU_TX->notify(mode, 2);
             delay(10);
         } break;
 
@@ -332,7 +307,7 @@ bool BLE_OTA_DFU::configure_OTA(NimBLEServer *pServer) {
         return false;
     }
 
-    BLECharacteristic *pCharacteristic_BLE_OTA_DFU_RX =
+    NimBLECharacteristic *pCharacteristic_BLE_OTA_DFU_RX =
         pServiceOTA->createCharacteristic(CHARACTERISTIC_OTA_BL_UUID_RX, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
 
     if (pCharacteristic_BLE_OTA_DFU_RX == nullptr) {
@@ -349,8 +324,6 @@ bool BLE_OTA_DFU::configure_OTA(NimBLEServer *pServer) {
         return false;
     }
 
-    // Start the BLE UART service
-    pServiceOTA->start();
     return true;
 }
 
@@ -375,12 +348,12 @@ void BLE_OTA_DFU::start_OTA() {
 
 bool BLE_OTA_DFU::begin(String local_name) {
     // Create the BLE Device
-    BLEDevice::init(local_name.c_str());
+    NimBLEDevice::init(local_name.c_str());
 
     ESP_LOGI(TAG, "Starting BLE UART services");
 
     // Create the BLE Server
-    pServer = BLEDevice::createServer();
+    pServer = NimBLEDevice::createServer();
 
     if (pServer == nullptr) {
         return false;
@@ -407,16 +380,13 @@ void BLE_OTA_DFU::setUpdating(bool updating) { this->updating = updating; }
 
 void BLE_OTA_DFU::send_OTA_DFU(uint8_t value) {
     uint8_t _value = value;
-    this->pCharacteristic_BLE_OTA_DFU_TX->setValue(&_value, 1);
-    this->pCharacteristic_BLE_OTA_DFU_TX->notify();
+    this->pCharacteristic_BLE_OTA_DFU_TX->notify(&_value, 1);
 }
 
 void BLE_OTA_DFU::send_OTA_DFU(uint8_t *value, size_t size) {
-    this->pCharacteristic_BLE_OTA_DFU_TX->setValue(value, size);
-    this->pCharacteristic_BLE_OTA_DFU_TX->notify();
+    this->pCharacteristic_BLE_OTA_DFU_TX->notify(value, size);
 }
 
 void BLE_OTA_DFU::send_OTA_DFU(String value) {
-    this->pCharacteristic_BLE_OTA_DFU_TX->setValue(value.c_str());
-    this->pCharacteristic_BLE_OTA_DFU_TX->notify();
+    this->pCharacteristic_BLE_OTA_DFU_TX->notify(reinterpret_cast<const uint8_t *>(value.c_str()), value.length());
 }
