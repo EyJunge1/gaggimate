@@ -5,8 +5,10 @@
 #include <NimBLEBondMigration.h>
 #include <NimBLEDevice.h>
 #include <Preferences.h>
+#include <cstdio>
 #include <cstring>
 #include <esp_log.h>
+#include <nvs.h>
 
 // Shared NVS namespace with the paired-peer address. The bond2x flag records that
 // the NimBLE 1.x NVS layout was converted so we do not re-run the helper every boot.
@@ -27,10 +29,61 @@ inline NimBLEAddress unpackPeerAddress(const uint8_t buf[7]) {
     return NimBLEAddress(addr);
 }
 
-// Must run before NimBLEDevice::init(). A successful conversion reboots so the
-// stack's first load of nimble_bond is already 2.x (official helper flow + #740:
-// do not init() in the same boot that rewrote the store). Failed migration leaves
-// pairing identity in gmble/peer; the user may need to re-pair for encryption keys.
+enum class NimBLEBondStoreLayout { Empty, Current, Legacy, Unknown, Unreadable };
+
+// Size-check our_sec_*/peer_sec_* with the helper's own structs (host packing can differ).
+// local_irk_* is not a trigger: 1.x often never wrote it.
+inline NimBLEBondStoreLayout probeNimBLEBondStoreLayout() {
+    nvs_handle_t handle = 0;
+    const esp_err_t openErr = nvs_open("nimble_bond", NVS_READONLY, &handle);
+    if (openErr == ESP_ERR_NVS_NOT_FOUND)
+        return NimBLEBondStoreLayout::Empty;
+    if (openErr != ESP_OK)
+        return NimBLEBondStoreLayout::Unreadable;
+
+    bool sawAny = false;
+    bool sawLegacy = false;
+    bool sawUnknown = false;
+    char key[16];
+    static constexpr const char *kPrefixes[] = {"our_sec", "peer_sec"};
+    const uint16_t maxEntries = MYNEWT_VAL(BLE_STORE_MAX_BONDS);
+    for (uint16_t i = 1; i <= maxEntries; ++i) {
+        for (const char *prefix : kPrefixes) {
+            const int written = snprintf(key, sizeof(key), "%s_%u", prefix, i);
+            if (written <= 0 || static_cast<size_t>(written) >= sizeof(key))
+                continue;
+            size_t blobSize = 0;
+            const esp_err_t err = nvs_get_blob(handle, key, nullptr, &blobSize);
+            if (err == ESP_ERR_NVS_NOT_FOUND)
+                continue;
+            if (err != ESP_OK) {
+                sawUnknown = true;
+                continue;
+            }
+            sawAny = true;
+            if (blobSize == sizeof(NimBLEBondMigration::detail::BleStoreValueSecV1))
+                sawLegacy = true;
+            else if (blobSize != sizeof(NimBLEBondMigration::detail::BleStoreValueSecCurrent))
+                sawUnknown = true;
+        }
+    }
+    nvs_close(handle);
+
+    if (sawLegacy)
+        return NimBLEBondStoreLayout::Legacy;
+    if (sawUnknown)
+        return NimBLEBondStoreLayout::Unknown;
+    if (sawAny)
+        return NimBLEBondStoreLayout::Current;
+    return NimBLEBondStoreLayout::Empty;
+}
+
+// Must run before NimBLEDevice::init(). Reboot only after a real 1.x→2.x rewrite so
+// the stack's first load of nimble_bond is already 2.x (official helper: do not
+// init() in the same boot that rewrote the store). Empty/already-2.x stores just
+// set the flag — calling the helper would plant the 1.x default IRK.
+// Rollback 2.x→1.x is not implemented: run migrateBondStoreToV1() or wipe
+// nimble_bond before flashing 1.x, otherwise init() can crash.
 inline void migrateNimBLEBondsOnce(const char *logTag) {
     Preferences prefs;
     if (!prefs.begin(GM_BLE_NVS_NAMESPACE, false)) {
@@ -41,7 +94,25 @@ inline void migrateNimBLEBondsOnce(const char *logTag) {
         prefs.end();
         return;
     }
-    // Returns true for an empty or already-2.x store; the helper logs converted counts.
+
+    const NimBLEBondStoreLayout layout = probeNimBLEBondStoreLayout();
+    if (layout == NimBLEBondStoreLayout::Unreadable) {
+        ESP_LOGW(logTag, "Could not read nimble_bond; will retry bond migration next boot");
+        prefs.end();
+        return;
+    }
+    if (layout == NimBLEBondStoreLayout::Empty || layout == NimBLEBondStoreLayout::Current) {
+        prefs.putBool(GM_BLE_NVS_BOND2X_KEY, true);
+        prefs.end();
+        return;
+    }
+    if (layout == NimBLEBondStoreLayout::Unknown) {
+        ESP_LOGW(logTag, "NimBLE bond store has unexpected record size; existing pairing may need re-pair");
+        prefs.putBool(GM_BLE_NVS_BOND2X_KEY, true);
+        prefs.end();
+        return;
+    }
+
     const bool ok = NimBLEBondMigration::migrateBondStoreToCurrent();
     if (!ok) {
         ESP_LOGW(logTag, "NimBLE bond store migration failed; existing pairing may need re-pair");
@@ -50,7 +121,7 @@ inline void migrateNimBLEBondsOnce(const char *logTag) {
     }
     prefs.putBool(GM_BLE_NVS_BOND2X_KEY, true);
     prefs.end();
-    ESP_LOGI(logTag, "NimBLE bond store ready for 2.x, restarting");
+    ESP_LOGI(logTag, "NimBLE bond store converted from 1.x, restarting");
     ESP.restart();
 }
 

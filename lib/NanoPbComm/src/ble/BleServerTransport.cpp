@@ -22,10 +22,10 @@ void BleServerTransport::init(const String &deviceName) {
     NimBLEService *service = _server->createService(gm_proto::SERVICE_UUID);
     _rxChar = service->createCharacteristic(gm_proto::RX_CHAR_UUID,
                                             NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR | NIMBLE_PROPERTY::WRITE_ENC);
-    _rxChar->setCallbacks(this, false);
+    _rxChar->setCallbacks(this);
     _txChar = service->createCharacteristic(gm_proto::TX_CHAR_UUID,
                                             NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY | NIMBLE_PROPERTY::READ_ENC);
-    _txChar->setCallbacks(this, false);
+    _txChar->setCallbacks(this);
     // INFO stays readable without encryption so legacy/pre-pairing readers work.
     _infoChar = service->createCharacteristic(gm_proto::INFO_CHAR_UUID, NIMBLE_PROPERTY::READ);
     _infoChar->setValue(std::string(_info.c_str()));
