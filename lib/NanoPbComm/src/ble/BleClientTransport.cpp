@@ -28,8 +28,9 @@ void BleClientTransport::init(const String &deviceName) {
 void BleClientTransport::scan() {
     _readyForConnection = false;
     _scanner->setScanCallbacks(this, true);
-    _scanner->setInterval(1000);
-    _scanner->setWindow(50);
+    // 2.x takes milliseconds (1.x used 0.625 ms units: 1000/50 → 625 ms / 31.25 ms).
+    _scanner->setInterval(625);
+    _scanner->setWindow(31);
     _scanner->setMaxResults(0);
     _scanner->setDuplicateFilter(false);
     _scanner->setActiveScan(false);

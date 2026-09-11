@@ -1,6 +1,7 @@
 #ifndef NANOPBCOMM_NIMBLE_BOND_STORE_H
 #define NANOPBCOMM_NIMBLE_BOND_STORE_H
 
+#include <Arduino.h>
 #include <NimBLEBondMigration.h>
 #include <NimBLEDevice.h>
 #include <Preferences.h>
@@ -26,8 +27,10 @@ inline NimBLEAddress unpackPeerAddress(const uint8_t buf[7]) {
     return NimBLEAddress(addr);
 }
 
-// Must run before NimBLEDevice::init(). Failed migration leaves pairing identity
-// in gmble/peer; the user may need to re-pair for encryption keys.
+// Must run before NimBLEDevice::init(). A successful conversion reboots so the
+// stack's first load of nimble_bond is already 2.x (official helper flow + #740:
+// do not init() in the same boot that rewrote the store). Failed migration leaves
+// pairing identity in gmble/peer; the user may need to re-pair for encryption keys.
 inline void migrateNimBLEBondsOnce(const char *logTag) {
     Preferences prefs;
     if (!prefs.begin(GM_BLE_NVS_NAMESPACE, false)) {
@@ -40,13 +43,15 @@ inline void migrateNimBLEBondsOnce(const char *logTag) {
     }
     // Returns true for an empty or already-2.x store; the helper logs converted counts.
     const bool ok = NimBLEBondMigration::migrateBondStoreToCurrent();
-    if (ok) {
-        prefs.putBool(GM_BLE_NVS_BOND2X_KEY, true);
-        ESP_LOGI(logTag, "NimBLE bond store ready for 2.x");
-    } else {
+    if (!ok) {
         ESP_LOGW(logTag, "NimBLE bond store migration failed; existing pairing may need re-pair");
+        prefs.end();
+        return;
     }
+    prefs.putBool(GM_BLE_NVS_BOND2X_KEY, true);
     prefs.end();
+    ESP_LOGI(logTag, "NimBLE bond store ready for 2.x, restarting");
+    ESP.restart();
 }
 
 #endif // NANOPBCOMM_NIMBLE_BOND_STORE_H
