@@ -173,6 +173,24 @@ void Settings::setStartupFillTime(int startup_fill_time) { startupFillTime.set(s
 
 void Settings::setSteamFillTime(int steam_fill_time) { steamFillTime.set(steam_fill_time); }
 
+void Settings::setBoilerFillPressureMode(bool boiler_fill_pressure_mode) {
+    boilerFillPressureMode.set(boiler_fill_pressure_mode);
+}
+
+void Settings::setBoilerFillPressure(float boiler_fill_pressure) {
+    boilerFillPressure.set(std::clamp(boiler_fill_pressure, 1.0f, 15.0f));
+}
+
+void Settings::setBoilerFillHoldTime(float boiler_fill_hold_time) {
+    boilerFillHoldTime.set(std::clamp(boiler_fill_hold_time, 0.0f, 10.0f));
+}
+
+void Settings::setBoilerFillMaxTime(int boiler_fill_max_time) { boilerFillMaxTime.set(std::clamp(boiler_fill_max_time, 1, 60)); }
+
+void Settings::setBoilerFillWaitTemp(float boiler_fill_wait_temp) {
+    boilerFillWaitTemp.set(std::clamp(boiler_fill_wait_temp, 0.0f, 140.0f));
+}
+
 void Settings::setSmartGrindActive(bool smart_grind_active) { smartGrindActive.set(smart_grind_active); }
 
 void Settings::setMahlkonigActive(bool mahlkonig_active) { mahlkonigActive.set(mahlkonig_active); }

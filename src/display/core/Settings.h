@@ -114,6 +114,11 @@ class Settings {
     bool isBoilerFillActive() const { return boilerFillActive.get(); }
     int getStartupFillTime() const { return startupFillTime.get(); }
     int getSteamFillTime() const { return steamFillTime.get(); }
+    bool isBoilerFillPressureMode() const { return boilerFillPressureMode.get(); }
+    float getBoilerFillPressure() const { return boilerFillPressure.get(); }
+    float getBoilerFillHoldTime() const { return boilerFillHoldTime.get(); }
+    int getBoilerFillMaxTime() const { return boilerFillMaxTime.get(); }
+    float getBoilerFillWaitTemp() const { return boilerFillWaitTemp.get(); }
     bool isSmartGrindActive() const { return smartGrindActive.get(); }
     bool isMahlkonigActive() const { return mahlkonigActive.get(); }
     String getMahlkonigRecipeProfiles() const { return mahlkonigRecipeProfiles.get(); }
@@ -228,6 +233,11 @@ class Settings {
     void setBoilerFillActive(bool boiler_fill_active);
     void setStartupFillTime(int startup_fill_time);
     void setSteamFillTime(int steam_fill_time);
+    void setBoilerFillPressureMode(bool boiler_fill_pressure_mode);
+    void setBoilerFillPressure(float boiler_fill_pressure);
+    void setBoilerFillHoldTime(float boiler_fill_hold_time);
+    void setBoilerFillMaxTime(int boiler_fill_max_time);
+    void setBoilerFillWaitTemp(float boiler_fill_wait_temp);
     void setSmartGrindActive(bool smart_grind_active);
     void setMahlkonigActive(bool mahlkonig_active);
     void setMahlkonigRecipeProfiles(String profiles);
@@ -338,6 +348,11 @@ class Settings {
     Property<bool> boilerFillActive{registry, "bf_a", false};
     Property<int> startupFillTime{registry, "bf_su", 5000};
     Property<int> steamFillTime{registry, "bf_st", 5000};
+    Property<bool> boilerFillPressureMode{registry, "bf_pm", true};
+    Property<float> boilerFillPressure{registry, "bf_pt", 8.0f};
+    Property<float> boilerFillHoldTime{registry, "bf_ph", 1.5f}; // seconds
+    Property<int> boilerFillMaxTime{registry, "bf_px", 20};      // seconds
+    Property<float> boilerFillWaitTemp{registry, "bf_wt", 100.0f};
     Property<bool> smartGrindActive{registry, "sg_a", false};
     Property<bool> smartGrindToggle{registry, "sg_t", false}; // legacy, seeds the smartGrindMode default
     Property<int> smartGrindMode{registry, "sg_m", 0};

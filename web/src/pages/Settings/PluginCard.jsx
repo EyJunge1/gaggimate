@@ -9,6 +9,7 @@ import { Trans, useLingui } from '@lingui/react/macro';
 import { useProfileList } from '../../services/hooks.js';
 
 const gearpumpAddon = computed(() => machine.value.capabilities.gearpumpAddon);
+const pressureAvailable = computed(() => machine.value.capabilities.pressure);
 
 const MAHLKONIG_MIN_RECIPES = 4;
 
@@ -254,35 +255,123 @@ export function PluginCard({
           />
         </div>
         {formData.boilerFillActive && (
-          <div className='border-base-300 mt-4 grid grid-cols-2 gap-4 border-t pt-4'>
-            <div className='form-control'>
-              <label htmlFor='startupFillTime' className='mb-2 block text-sm font-medium'>
-                <Trans>On startup (s)</Trans>
-              </label>
-              <input
-                id='startupFillTime'
-                name='startupFillTime'
-                type='number'
-                className='input input-bordered w-full'
-                placeholder='0'
-                value={formData.startupFillTime}
-                onChange={onChange('startupFillTime')}
-              />
+          <div className='border-base-300 mt-4 space-y-4 border-t pt-4'>
+            <div className='grid grid-cols-2 gap-4'>
+              <div className='form-control'>
+                <label htmlFor='startupFillTime' className='mb-2 block text-sm font-medium'>
+                  <Trans>On startup (s)</Trans>
+                </label>
+                <input
+                  id='startupFillTime'
+                  name='startupFillTime'
+                  type='number'
+                  className='input input-bordered w-full'
+                  placeholder='0'
+                  value={formData.startupFillTime}
+                  onChange={onChange('startupFillTime')}
+                />
+              </div>
+              <div className='form-control'>
+                <label htmlFor='steamFillTime' className='mb-2 block text-sm font-medium'>
+                  <Trans>On steam deactivate (s)</Trans>
+                </label>
+                <input
+                  id='steamFillTime'
+                  name='steamFillTime'
+                  type='number'
+                  className='input input-bordered w-full'
+                  placeholder='0'
+                  value={formData.steamFillTime}
+                  onChange={onChange('steamFillTime')}
+                />
+              </div>
             </div>
-            <div className='form-control'>
-              <label htmlFor='steamFillTime' className='mb-2 block text-sm font-medium'>
-                <Trans>On steam deactivate (s)</Trans>
-              </label>
-              <input
-                id='steamFillTime'
-                name='steamFillTime'
-                type='number'
-                className='input input-bordered w-full'
-                placeholder='0'
-                value={formData.steamFillTime}
-                onChange={onChange('steamFillTime')}
-              />
-            </div>
+            {pressureAvailable.value && (
+              <>
+                <div className='flex items-center justify-between'>
+                  <label htmlFor='boilerFillPressureMode' className='text-sm font-medium'>
+                    <Trans>Pressure-based refill</Trans>
+                  </label>
+                  <input
+                    id='boilerFillPressureMode'
+                    name='boilerFillPressureMode'
+                    value='boilerFillPressureMode'
+                    type='checkbox'
+                    className='toggle toggle-primary'
+                    checked={!!formData.boilerFillPressureMode}
+                    onChange={onChange('boilerFillPressureMode')}
+                    aria-label={t`Enable pressure-based refill`}
+                  />
+                </div>
+                {formData.boilerFillPressureMode && (
+                  <div className='grid grid-cols-2 gap-4'>
+                    <div className='form-control'>
+                      <label htmlFor='boilerFillPressure' className='mb-2 block text-sm font-medium'>
+                        <Trans>Full threshold (bar)</Trans>
+                      </label>
+                      <input
+                        id='boilerFillPressure'
+                        name='boilerFillPressure'
+                        type='number'
+                        step='0.1'
+                        min='1'
+                        max='15'
+                        className='input input-bordered w-full'
+                        value={formData.boilerFillPressure}
+                        onChange={onChange('boilerFillPressure')}
+                      />
+                    </div>
+                    <div className='form-control'>
+                      <label htmlFor='boilerFillHoldTime' className='mb-2 block text-sm font-medium'>
+                        <Trans>Hold time (s)</Trans>
+                      </label>
+                      <input
+                        id='boilerFillHoldTime'
+                        name='boilerFillHoldTime'
+                        type='number'
+                        step='0.1'
+                        min='0'
+                        max='10'
+                        className='input input-bordered w-full'
+                        value={formData.boilerFillHoldTime}
+                        onChange={onChange('boilerFillHoldTime')}
+                      />
+                    </div>
+                    <div className='form-control'>
+                      <label htmlFor='boilerFillMaxTime' className='mb-2 block text-sm font-medium'>
+                        <Trans>Max time (s)</Trans>
+                      </label>
+                      <input
+                        id='boilerFillMaxTime'
+                        name='boilerFillMaxTime'
+                        type='number'
+                        min='1'
+                        max='60'
+                        className='input input-bordered w-full'
+                        value={formData.boilerFillMaxTime}
+                        onChange={onChange('boilerFillMaxTime')}
+                      />
+                    </div>
+                    <div className='form-control'>
+                      <label htmlFor='boilerFillWaitTemp' className='mb-2 block text-sm font-medium'>
+                        <Trans>Steam refill wait temp (°C)</Trans>
+                      </label>
+                      <input
+                        id='boilerFillWaitTemp'
+                        name='boilerFillWaitTemp'
+                        type='number'
+                        step='1'
+                        min='0'
+                        max='140'
+                        className='input input-bordered w-full'
+                        value={formData.boilerFillWaitTemp}
+                        onChange={onChange('boilerFillWaitTemp')}
+                      />
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
       </div>

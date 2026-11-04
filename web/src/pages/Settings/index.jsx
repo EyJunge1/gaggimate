@@ -62,6 +62,7 @@ import { isApp } from '../../app/platform.js';
 const CHECKBOX_KEYS = [
   'homekit',
   'boilerFillActive',
+  'boilerFillPressureMode',
   'smartGrindActive',
   'mahlkonigActive',
   'homeAssistant',

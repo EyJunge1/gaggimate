@@ -8,10 +8,14 @@ struct Event;
 class BoilerFillPlugin : public Plugin {
   public:
     void setup(Controller *controller, PluginManager *pluginManager) override;
-    void loop() override {};
+    void loop() override;
 
   private:
+    bool usePressureFill() const;
+    void startFillProcess(bool startup);
+
     Controller *controller = nullptr;
+    bool steamFillPending = false;
 };
 
 #endif // BOILERFILLPLUGIN_H

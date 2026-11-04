@@ -385,6 +385,16 @@ void WebUIPlugin::handleSettings(AsyncWebServerRequest *request) const {
                 settings->setStartupFillTime(request->arg("startupFillTime").toInt() * 1000);
             if (request->hasArg("steamFillTime"))
                 settings->setSteamFillTime(request->arg("steamFillTime").toInt() * 1000);
+            if (request->hasArg("boilerFillPressureMode"))
+                settings->setBoilerFillPressureMode(parseBoolArg(request->arg("boilerFillPressureMode")));
+            if (request->hasArg("boilerFillPressure"))
+                settings->setBoilerFillPressure(request->arg("boilerFillPressure").toFloat());
+            if (request->hasArg("boilerFillHoldTime"))
+                settings->setBoilerFillHoldTime(request->arg("boilerFillHoldTime").toFloat());
+            if (request->hasArg("boilerFillMaxTime"))
+                settings->setBoilerFillMaxTime(request->arg("boilerFillMaxTime").toInt());
+            if (request->hasArg("boilerFillWaitTemp"))
+                settings->setBoilerFillWaitTemp(request->arg("boilerFillWaitTemp").toFloat());
             if (request->hasArg("smartGrindActive"))
                 settings->setSmartGrindActive(parseBoolArg(request->arg("smartGrindActive")));
             if (request->hasArg("smartGrindIp"))
@@ -579,6 +589,11 @@ void WebUIPlugin::handleSettings(AsyncWebServerRequest *request) const {
     doc["boilerFillActive"] = settings.isBoilerFillActive();
     doc["startupFillTime"] = settings.getStartupFillTime() / 1000;
     doc["steamFillTime"] = settings.getSteamFillTime() / 1000;
+    doc["boilerFillPressureMode"] = settings.isBoilerFillPressureMode();
+    doc["boilerFillPressure"] = settings.getBoilerFillPressure();
+    doc["boilerFillHoldTime"] = settings.getBoilerFillHoldTime();
+    doc["boilerFillMaxTime"] = settings.getBoilerFillMaxTime();
+    doc["boilerFillWaitTemp"] = settings.getBoilerFillWaitTemp();
     doc["smartGrindActive"] = settings.isSmartGrindActive();
     doc["smartGrindIp"] = settings.getSmartGrindIp();
     doc["smartGrindMode"] = settings.getSmartGrindMode();
