@@ -24,8 +24,9 @@ bool BoilerFillPlugin::startFillProcess(bool startup) {
         const int duration = startup ? settings.getStartupFillTime() : settings.getSteamFillTime();
         controller->startProcess(new PumpProcess(duration));
     }
-    // startProcess deletes the process when rejected (active/not ready); isActive() reflects acceptance.
-    return controller->isActive();
+    // startProcess deletes the process when rejected. Use getProcess(), not isActive():
+    // PumpProcess(0) is accepted but immediately inactive.
+    return controller->getProcess() != nullptr;
 }
 
 void BoilerFillPlugin::setup(Controller *controller, PluginManager *pluginManager) {
@@ -69,9 +70,12 @@ void BoilerFillPlugin::loop() {
     if (!controller->isReady() || controller->isActive())
         return;
 
-    const float waitTemp = controller->getSettings().getBoilerFillWaitTemp();
-    if (waitTemp > 0.0f && controller->getCurrentTemp() >= waitTemp)
-        return;
+    // Temp wait is pressure-path only; timed fallback keeps the old immediate start.
+    if (usePressureFill()) {
+        const float waitTemp = controller->getSettings().getBoilerFillWaitTemp();
+        if (waitTemp > 0.0f && controller->getCurrentTemp() >= waitTemp)
+            return;
+    }
 
     if (startFillProcess(false))
         steamFillPending = false;
