@@ -348,7 +348,7 @@ class Settings {
     Property<bool> boilerFillActive{registry, "bf_a", false};
     Property<int> startupFillTime{registry, "bf_su", 5000};
     Property<int> steamFillTime{registry, "bf_st", 5000};
-    Property<bool> boilerFillPressureMode{registry, "bf_pm", true};
+    Property<bool> boilerFillPressureMode{registry, "bf_pm", false};
     Property<float> boilerFillPressure{registry, "bf_pt", 8.0f};
     Property<float> boilerFillHoldTime{registry, "bf_ph", 1.5f}; // seconds
     Property<int> boilerFillMaxTime{registry, "bf_px", 20};      // seconds

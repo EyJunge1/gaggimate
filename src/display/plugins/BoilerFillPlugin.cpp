@@ -13,18 +13,19 @@ bool BoilerFillPlugin::usePressureFill() const {
     return settings.isBoilerFillPressureMode() && caps.pressure && !caps.dualBoiler;
 }
 
-void BoilerFillPlugin::startFillProcess(bool startup) {
+bool BoilerFillPlugin::startFillProcess(bool startup) {
     auto &settings = controller->getSettings();
     if (usePressureFill()) {
         const unsigned long holdMs = static_cast<unsigned long>(settings.getBoilerFillHoldTime() * 1000.0f);
         const unsigned long maxMs = static_cast<unsigned long>(settings.getBoilerFillMaxTime()) * 1000UL;
         controller->startProcess(new PressureFillProcess([this]() { return this->controller->getCurrentPressure(); },
                                                          settings.getBoilerFillPressure(), holdMs, maxMs));
-        return;
+    } else {
+        const int duration = startup ? settings.getStartupFillTime() : settings.getSteamFillTime();
+        controller->startProcess(new PumpProcess(duration));
     }
-
-    const int duration = startup ? settings.getStartupFillTime() : settings.getSteamFillTime();
-    controller->startProcess(new PumpProcess(duration));
+    // startProcess deletes the process when rejected (active/not ready); isActive() reflects acceptance.
+    return controller->isActive();
 }
 
 void BoilerFillPlugin::setup(Controller *controller, PluginManager *pluginManager) {
@@ -43,6 +44,9 @@ void BoilerFillPlugin::setup(Controller *controller, PluginManager *pluginManage
             return;
 
         if (this->usePressureFill()) {
+            // steamFillTime == 0 still disables steam refill in pressure mode.
+            if (this->controller->getSettings().getSteamFillTime() == 0)
+                return;
             // Defer until idle outside steam/standby and below wait temperature.
             // Also covers steam → standby, which the time-based path skipped.
             this->steamFillPending = true;
@@ -57,11 +61,8 @@ void BoilerFillPlugin::setup(Controller *controller, PluginManager *pluginManage
 void BoilerFillPlugin::loop() {
     if (!steamFillPending || controller == nullptr)
         return;
-    if (!usePressureFill()) {
-        steamFillPending = false;
-        return;
-    }
 
+    // Keep pending if pressure mode is toggled off; startFillProcess picks the timed path.
     const int mode = controller->getMode();
     if (mode == MODE_STEAM || mode == MODE_STANDBY)
         return;
@@ -72,6 +73,6 @@ void BoilerFillPlugin::loop() {
     if (waitTemp > 0.0f && controller->getCurrentTemp() >= waitTemp)
         return;
 
-    steamFillPending = false;
-    startFillProcess(false);
+    if (startFillProcess(false))
+        steamFillPending = false;
 }

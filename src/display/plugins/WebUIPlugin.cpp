@@ -387,13 +387,13 @@ void WebUIPlugin::handleSettings(AsyncWebServerRequest *request) const {
                 settings->setSteamFillTime(request->arg("steamFillTime").toInt() * 1000);
             if (request->hasArg("boilerFillPressureMode"))
                 settings->setBoilerFillPressureMode(parseBoolArg(request->arg("boilerFillPressureMode")));
-            if (request->hasArg("boilerFillPressure"))
+            if (request->hasArg("boilerFillPressure") && !request->arg("boilerFillPressure").isEmpty())
                 settings->setBoilerFillPressure(request->arg("boilerFillPressure").toFloat());
-            if (request->hasArg("boilerFillHoldTime"))
+            if (request->hasArg("boilerFillHoldTime") && !request->arg("boilerFillHoldTime").isEmpty())
                 settings->setBoilerFillHoldTime(request->arg("boilerFillHoldTime").toFloat());
             if (request->hasArg("boilerFillMaxTime"))
                 settings->setBoilerFillMaxTime(request->arg("boilerFillMaxTime").toInt());
-            if (request->hasArg("boilerFillWaitTemp"))
+            if (request->hasArg("boilerFillWaitTemp") && !request->arg("boilerFillWaitTemp").isEmpty())
                 settings->setBoilerFillWaitTemp(request->arg("boilerFillWaitTemp").toFloat());
             if (request->hasArg("smartGrindActive"))
                 settings->setSmartGrindActive(parseBoolArg(request->arg("smartGrindActive")));

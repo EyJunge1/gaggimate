@@ -2,7 +2,8 @@
 //
 //   g++ -std=c++17 -I. -I../../src pressure_fill_host_test.cpp -o t && ./t
 //
-// Expected: full ~2.4 s, empty ~7 s, dry-run timeout 20 s, short spike ignored.
+// Expected: full ~2.4 s, empty ~7 s, dry-run timeout 20 s, short spike ignored,
+// hold=0 finishes on the first above-threshold sample.
 
 #include <cassert>
 #include <cmath>
@@ -25,10 +26,10 @@ constexpr unsigned long kHoldMs = 1500;
 constexpr unsigned long kMaxMs = 20000;
 constexpr unsigned long kStepMs = 100;
 
-unsigned long runUntilDone(const std::function<float(unsigned long)> &curve) {
+unsigned long runUntilDone(const std::function<float(unsigned long)> &curve, unsigned long holdMs = kHoldMs) {
     g_millis = 0;
     g_pressure = curve(0);
-    PressureFillProcess proc([]() { return g_pressure; }, kThreshold, kHoldMs, kMaxMs);
+    PressureFillProcess proc([]() { return g_pressure; }, kThreshold, holdMs, kMaxMs);
 
     while (proc.isActive()) {
         g_millis += kStepMs;
@@ -84,6 +85,11 @@ int main() {
     const unsigned long spikeMs = runUntilDone(shortSpike);
     std::printf("short spike: %lu ms (should time out)\n", spikeMs);
     assert(near(spikeMs, 20000, 100));
+
+    // Hold 0: finishes on the first sample at/above threshold (900 ms), no extra cycle.
+    const unsigned long zeroHoldMs = runUntilDone(fullBoiler, 0);
+    std::printf("hold=0: %lu ms\n", zeroHoldMs);
+    assert(near(zeroHoldMs, 900, 100));
 
     std::printf("all pressure-fill host tests passed\n");
     return 0;

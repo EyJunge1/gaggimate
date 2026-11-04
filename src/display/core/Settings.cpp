@@ -178,16 +178,22 @@ void Settings::setBoilerFillPressureMode(bool boiler_fill_pressure_mode) {
 }
 
 void Settings::setBoilerFillPressure(float boiler_fill_pressure) {
+    if (!std::isfinite(boiler_fill_pressure))
+        return;
     boilerFillPressure.set(std::clamp(boiler_fill_pressure, 1.0f, 15.0f));
 }
 
 void Settings::setBoilerFillHoldTime(float boiler_fill_hold_time) {
+    if (!std::isfinite(boiler_fill_hold_time))
+        return;
     boilerFillHoldTime.set(std::clamp(boiler_fill_hold_time, 0.0f, 10.0f));
 }
 
 void Settings::setBoilerFillMaxTime(int boiler_fill_max_time) { boilerFillMaxTime.set(std::clamp(boiler_fill_max_time, 1, 60)); }
 
 void Settings::setBoilerFillWaitTemp(float boiler_fill_wait_temp) {
+    if (!std::isfinite(boiler_fill_wait_temp))
+        return;
     boilerFillWaitTemp.set(std::clamp(boiler_fill_wait_temp, 0.0f, 140.0f));
 }
 

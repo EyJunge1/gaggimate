@@ -286,7 +286,7 @@ export function PluginCard({
                 />
               </div>
             </div>
-            {pressureAvailable.value && (
+            {pressureAvailable.value && !machine.value.capabilities.dualBoiler && (
               <>
                 <div className='flex items-center justify-between'>
                   <label htmlFor='boilerFillPressureMode' className='text-sm font-medium'>

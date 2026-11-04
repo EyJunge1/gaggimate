@@ -42,7 +42,7 @@ class PressureFillProcess : public Process {
         if (pressure >= pressureThreshold) {
             if (aboveSince == 0)
                 aboveSince = now;
-            else if (now - aboveSince >= holdTimeMs) {
+            if (now - aboveSince >= holdTimeMs) {
                 ESP_LOGI(LOG_TAG, "PressureFill: Boiler full after %lu ms", elapsed);
                 finished = true;
             }
